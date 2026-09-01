@@ -17,6 +17,8 @@ var (
 	ErrInvalidEventType = errors.New("event_type is required")
 	ErrInvalidPayload   = errors.New("payload is required")
 	ErrEndpointNotFound = errors.New("endpoint not found")
+	ErrInvalidStatus    = errors.New("invalid status filter")
+	ErrEventNotFailed   = errors.New("only a FAILED event can be retried")
 )
 
 // Service contains event business logic, keeping HTTP handlers thin.
@@ -114,6 +116,55 @@ func (s *Service) Deliver(ctx context.Context, eventID string) error {
 	}
 
 	return nil
+}
+
+// List returns the most recent events, optionally filtered by status.
+func (s *Service) List(ctx context.Context, status string) ([]*Event, error) {
+	if status != "" && !validStatuses[status] {
+		return nil, ErrInvalidStatus
+	}
+	return s.repo.List(ctx, status)
+}
+
+// GetWithAttempts returns an event along with its full delivery attempt
+// history, for the event detail view.
+func (s *Service) GetWithAttempts(ctx context.Context, eventID string) (*EventDetail, error) {
+	ev, err := s.repo.GetByID(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	attempts, err := s.attempts.ListByEvent(ctx, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load delivery attempts for event %s: %w", eventID, err)
+	}
+
+	return &EventDetail{Event: *ev, Attempts: attempts}, nil
+}
+
+// Retry re-queues a FAILED event for another immediate delivery attempt
+// (bypassing any backoff wait). The outcome is decided by Deliver exactly
+// like any other attempt — a retryable failure with attempts remaining goes
+// back to RETRYING, otherwise FAILED again.
+func (s *Service) Retry(ctx context.Context, eventID string) (*Event, error) {
+	ev, err := s.repo.GetByID(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+	if ev.Status != StatusFailed {
+		return nil, ErrEventNotFailed
+	}
+
+	if err := s.queue.Enqueue(ctx, ev.ID); err != nil {
+		return nil, fmt.Errorf("failed to queue event %s for retry: %w", ev.ID, err)
+	}
+
+	updated, err := s.repo.UpdateStatus(ctx, ev.ID, StatusRetrying, ev.AttemptCount, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update event %s for retry: %w", ev.ID, err)
+	}
+
+	return updated, nil
 }
 
 // EnqueueDueRetries finds RETRYING events whose backoff has elapsed and

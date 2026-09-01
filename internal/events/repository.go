@@ -70,6 +70,54 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*Event, error) {
 	return &ev, nil
 }
 
+// listLimit caps how many events a single List call can return, so the
+// dashboard's list view can't accidentally pull an unbounded result set.
+const listLimit = 200
+
+// List returns the most recent events, optionally filtered by status.
+func (r *Repository) List(ctx context.Context, status string) ([]*Event, error) {
+	var rows pgx.Rows
+	var err error
+	if status == "" {
+		const query = `
+			SELECT id, endpoint_id, event_type, payload, status, attempt_count, next_retry_at, created_at, updated_at
+			FROM events
+			ORDER BY created_at DESC
+			LIMIT $1
+		`
+		rows, err = r.pool.Query(ctx, query, listLimit)
+	} else {
+		const query = `
+			SELECT id, endpoint_id, event_type, payload, status, attempt_count, next_retry_at, created_at, updated_at
+			FROM events
+			WHERE status = $1
+			ORDER BY created_at DESC
+			LIMIT $2
+		`
+		rows, err = r.pool.Query(ctx, query, status, listLimit)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to list events: %w", err)
+	}
+	defer rows.Close()
+
+	events := []*Event{}
+	for rows.Next() {
+		var ev Event
+		if err := rows.Scan(
+			&ev.ID, &ev.EndpointID, &ev.EventType, &ev.Payload, &ev.Status, &ev.AttemptCount, &ev.NextRetryAt, &ev.CreatedAt, &ev.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan event: %w", err)
+		}
+		events = append(events, &ev)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed reading events: %w", err)
+	}
+
+	return events, nil
+}
+
 // UpdateStatus sets an event's status, attempt count, and next retry time
 // (nil clears it — used for terminal states and once a due retry has been
 // re-queued), returning the updated row.

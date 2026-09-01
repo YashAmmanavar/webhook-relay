@@ -12,6 +12,9 @@ func NewRouter(endpointsHandler *handlers.EndpointsHandler, eventsHandler *handl
 
 	mux.HandleFunc("POST /api/v1/endpoints", endpointsHandler.Create)
 	mux.HandleFunc("POST /api/v1/events", eventsHandler.Create)
+	mux.HandleFunc("GET /api/v1/events", eventsHandler.List)
+	mux.HandleFunc("GET /api/v1/events/{id}", eventsHandler.Get)
+	mux.HandleFunc("POST /api/v1/events/{id}/retry", eventsHandler.Retry)
 	mux.HandleFunc("GET /api/v1/health", healthHandler)
 
 	return mux
