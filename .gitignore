@@ -1,0 +1,34 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/bin/
+/api
+/worker
+
+# Test binaries and coverage
+*.test
+*.out
+
+# Go build/vendor
+vendor/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env files (none currently, but keep out if added later)
+.env
+.env.local
+
+# Dashboard (Node, once it exists)
+dashboard/node_modules/
+dashboard/.next/
+dashboard/dist/
