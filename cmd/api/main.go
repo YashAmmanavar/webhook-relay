@@ -8,6 +8,7 @@ import (
 
 	"webhookrelay/internal/api"
 	"webhookrelay/internal/api/handlers"
+	"webhookrelay/internal/api/middleware"
 	"webhookrelay/internal/database"
 	"webhookrelay/internal/delivery"
 	"webhookrelay/internal/endpoints"
@@ -45,10 +46,11 @@ func main() {
 	eventsHandler := handlers.NewEventsHandler(eventsService)
 
 	router := api.NewRouter(endpointsHandler, eventsHandler)
+	handler := middleware.CORS(router)
 
 	const addr = ":8080"
 	log.Printf("listening on %s", addr)
-	if err := http.ListenAndServe(addr, router); err != nil {
+	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }

@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"webhookrelay/internal/delivery"
 )
 
 // Status values match the CHECK constraint on the events table.
@@ -16,6 +18,15 @@ const (
 	StatusDelivered  = "DELIVERED"
 	StatusFailed     = "FAILED"
 )
+
+// validStatuses is used to reject an unrecognized ?status= filter value.
+var validStatuses = map[string]bool{
+	StatusPending:    true,
+	StatusProcessing: true,
+	StatusRetrying:   true,
+	StatusDelivered:  true,
+	StatusFailed:     true,
+}
 
 // Event is a single webhook delivery attempt record, queued for delivery to
 // an endpoint.
@@ -29,6 +40,13 @@ type Event struct {
 	NextRetryAt  *time.Time      `json:"next_retry_at,omitempty"`
 	CreatedAt    time.Time       `json:"created_at"`
 	UpdatedAt    time.Time       `json:"updated_at"`
+}
+
+// EventDetail is an event plus its full delivery attempt history, returned
+// by GET /api/v1/events/:id.
+type EventDetail struct {
+	Event
+	Attempts []delivery.Attempt `json:"attempts"`
 }
 
 // generateID returns a random identifier of the form "<prefix><32 hex chars>",
