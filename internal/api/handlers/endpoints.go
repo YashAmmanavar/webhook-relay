@@ -30,8 +30,7 @@ type endpointResponse struct {
 // Create handles POST /api/v1/endpoints.
 func (h *EndpointsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createEndpointRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeJSON(w, r, &req) {
 		return
 	}
 
@@ -61,4 +60,20 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
+}
+
+// decodeJSON decodes the request body into v, writing an appropriate error
+// response and returning false on failure — a 413 if the body exceeded the
+// middleware.BodyLimit cap, otherwise a 400 for any other decode error.
+func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "request body too large")
+		} else {
+			writeError(w, http.StatusBadRequest, "invalid JSON body")
+		}
+		return false
+	}
+	return true
 }

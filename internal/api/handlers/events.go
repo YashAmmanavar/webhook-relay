@@ -31,8 +31,7 @@ type createEventResponse struct {
 // Create handles POST /api/v1/events.
 func (h *EventsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createEventRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if !decodeJSON(w, r, &req) {
 		return
 	}
 

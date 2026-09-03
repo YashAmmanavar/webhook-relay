@@ -1,4 +1,8 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+// Matches the API's default dev key (cmd/api/main.go) so this works out of
+// the box against a freshly cloned server with no env vars set. Never reuse
+// this beyond localhost.
+const API_KEY = import.meta.env.VITE_API_KEY ?? "sk_dev_local_only_insecure_key";
 
 export type EventStatus = "PENDING" | "PROCESSING" | "RETRYING" | "DELIVERED" | "FAILED";
 
@@ -30,7 +34,13 @@ export interface EventDetail extends Event {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, init);
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      ...init?.headers,
+      Authorization: `Bearer ${API_KEY}`,
+    },
+  });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? `request failed with status ${res.status}`);

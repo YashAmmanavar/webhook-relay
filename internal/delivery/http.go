@@ -41,7 +41,10 @@ type Client struct {
 
 func NewClient() *Client {
 	return &Client{
-		httpClient: &http.Client{Timeout: requestTimeout},
+		httpClient: &http.Client{
+			Timeout:   requestTimeout,
+			Transport: &http.Transport{DialContext: safeDialContext},
+		},
 	}
 }
 
