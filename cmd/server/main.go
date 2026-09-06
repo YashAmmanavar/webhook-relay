@@ -1,3 +1,10 @@
+// Command server runs the HTTP API and the delivery worker in a single
+// process — a deployment-specific packaging choice for hosts whose free
+// tier only supports one always-on web service, not a separate
+// continuously-running background worker (e.g. Render). cmd/api and
+// cmd/worker remain as independent binaries for local dev and for any
+// deployment that can run them as separate, independently-scalable
+// services.
 package main
 
 import (
@@ -5,6 +12,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"webhookrelay/internal/api"
@@ -15,6 +24,7 @@ import (
 	"webhookrelay/internal/endpoints"
 	"webhookrelay/internal/events"
 	"webhookrelay/internal/queue"
+	"webhookrelay/internal/worker"
 )
 
 // devAPIKey is used only when WEBHOOK_RELAY_API_KEY isn't set. Fine for
@@ -22,7 +32,10 @@ import (
 const devAPIKey = "sk_dev_local_only_insecure_key"
 
 func main() {
-	connectCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	connectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	pool, err := database.NewPool(connectCtx, database.ConnStringFromEnv())
 	cancel()
 	if err != nil {
@@ -30,7 +43,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	redisCtx, redisCancel := context.WithTimeout(ctx, 5*time.Second)
 	redisClient, err := queue.NewClient(redisCtx, queue.Config{Addr: queue.AddrFromEnv()})
 	redisCancel()
 	if err != nil {
@@ -70,8 +83,21 @@ func main() {
 	}
 	addr := ":" + port
 
-	log.Printf("listening on %s", addr)
-	if err := http.ListenAndServe(addr, handler); err != nil {
+	// The worker loop runs in the background; the HTTP server in the
+	// foreground is what a PaaS's health check / keep-alive ping sees, and
+	// keeping this one process alive keeps the worker goroutine alive too.
+	go worker.Run(ctx, eventsService, eventQueue)
+
+	srv := &http.Server{Addr: addr, Handler: handler}
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		_ = srv.Shutdown(shutdownCtx)
+	}()
+
+	log.Printf("combined server (api+worker) listening on %s", addr)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server error: %v", err)
 	}
 }

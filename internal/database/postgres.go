@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -38,10 +39,21 @@ func (c Config) connString() string {
 	)
 }
 
+// ConnStringFromEnv returns the Postgres connection string to use:
+// DATABASE_URL if set — the form managed hosts like Neon or Supabase hand
+// you (e.g. "postgresql://user:pass@host/db?sslmode=require") — otherwise
+// the local dev DefaultConfig().
+func ConnStringFromEnv() string {
+	if url := os.Getenv("DATABASE_URL"); url != "" {
+		return url
+	}
+	return DefaultConfig().connString()
+}
+
 // NewPool creates and verifies a Postgres connection pool using pgx.
 // Call Close() on the returned pool when your application shuts down.
-func NewPool(ctx context.Context, cfg Config) (*pgxpool.Pool, error) {
-	pool, err := pgxpool.New(ctx, cfg.connString())
+func NewPool(ctx context.Context, connString string) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.New(ctx, connString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}

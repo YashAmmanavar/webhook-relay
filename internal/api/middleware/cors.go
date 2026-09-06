@@ -2,13 +2,14 @@ package middleware
 
 import "net/http"
 
-// CORS allows the dashboard (served from a different origin/port during
-// development) to call this API from the browser. Wide open for now since
-// there's no auth yet — tighten this to a specific configured origin once
-// Phase 9 (security) adds API authentication.
-func CORS(next http.Handler) http.Handler {
+// CORS allows the dashboard (served from a different origin/port) to call
+// this API from the browser. allowedOrigin is normally "*" for local dev,
+// but should be set to the dashboard's real deployed origin in production
+// (via the ALLOWED_ORIGIN env var — see cmd/api/main.go) now that requests
+// carry an API key worth not exposing to arbitrary origins.
+func CORS(allowedOrigin string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
