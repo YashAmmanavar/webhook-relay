@@ -171,6 +171,17 @@ func (s *Service) Retry(ctx context.Context, eventID string) (*Event, error) {
 // re-queues them for delivery, clearing next_retry_at so the scanner doesn't
 // pick the same event up again before Deliver processes it. Returns how many
 // were re-queued. Intended to be called on a timer by the worker process.
+//
+// Clearing next_retry_at happens BEFORE enqueueing, not after — enqueueing
+// first would let the worker pick up and fully process the message (a fresh
+// attempt_count and next_retry_at/terminal status) before this stale-data
+// UpdateStatus call runs, so the clear could land afterward and clobber that
+// newer write. Observed live: attempt_count regressing and next_retry_at
+// getting wiped to null while status stayed RETRYING, silently orphaning the
+// event from both the scanner (which requires next_retry_at IS NOT NULL) and
+// the dashboard's Retry button (which only shows for FAILED). Clearing first
+// guarantees this write happens-before the message could possibly be
+// reprocessed, closing the race.
 func (s *Service) EnqueueDueRetries(ctx context.Context) (int, error) {
 	due, err := s.repo.FindDueRetries(ctx)
 	if err != nil {
@@ -178,11 +189,11 @@ func (s *Service) EnqueueDueRetries(ctx context.Context) (int, error) {
 	}
 
 	for _, ev := range due {
-		if err := s.queue.Enqueue(ctx, ev.ID); err != nil {
-			return 0, fmt.Errorf("failed to re-queue event %s: %w", ev.ID, err)
-		}
 		if _, err := s.repo.UpdateStatus(ctx, ev.ID, StatusRetrying, ev.AttemptCount, nil); err != nil {
 			return 0, fmt.Errorf("failed to clear next_retry_at for event %s: %w", ev.ID, err)
+		}
+		if err := s.queue.Enqueue(ctx, ev.ID); err != nil {
+			return 0, fmt.Errorf("failed to re-queue event %s: %w", ev.ID, err)
 		}
 	}
 
