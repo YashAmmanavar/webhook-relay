@@ -31,6 +31,28 @@ h1 {
   margin-bottom: 20px;
 }
 
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.header-row h1 {
+  margin-bottom: 0;
+}
+
+.header-row button {
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid #1a7f37;
+  background: #1a7f37;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 h2 {
   font-size: 18px;
 }
@@ -141,4 +163,71 @@ button {
   color: #6e7781;
   font-size: 12px;
   margin-top: 4px;
+}
+
+.send-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 520px;
+}
+
+.send-form-note {
+  color: #6e7781;
+  font-size: 13px;
+  margin: 0;
+}
+
+.send-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.send-form input,
+.send-form textarea {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background: transparent;
+  color: inherit;
+}
+
+.send-form textarea {
+  resize: vertical;
+}
+
+.send-form-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.send-form-actions button[type="submit"] {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid #1a7f37;
+  background: #1a7f37;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.send-form-actions button.secondary {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.send-form-actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }

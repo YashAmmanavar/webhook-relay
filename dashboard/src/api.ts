@@ -60,3 +60,29 @@ export function getEvent(id: string): Promise<EventDetail> {
 export function retryEvent(id: string): Promise<{ event_id: string; status: EventStatus }> {
   return request(`/api/v1/events/${id}/retry`, { method: "POST" });
 }
+
+export interface Endpoint {
+  id: string;
+  url: string;
+  secret: string;
+}
+
+export function createEndpoint(url: string): Promise<Endpoint> {
+  return request<Endpoint>("/api/v1/endpoints", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+}
+
+export function createEvent(
+  endpointId: string,
+  eventType: string,
+  payload: unknown,
+): Promise<{ event_id: string; status: EventStatus }> {
+  return request("/api/v1/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ endpoint_id: endpointId, event_type: eventType, payload }),
+  });
+}
